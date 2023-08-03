@@ -25,6 +25,12 @@ provider:
     name: ${self:service}-${self:provider.stage}-deployment-641 ##MUST BE UNIQUE IN EACH REGION
     
   ### Lambda Settings
+  
+  ### Global environment Vars for lambdas
+  environment:
+    DYNAMO_TABLE_NAME: 'userTable'
+    USER_INDEX: 'EmailIndex'
+
   runtime: nodejs18.x #node version
   memorySize: 1024 # optional, in MB, default is 1024
   timeout: 20 # optional, in seconds, default is 6
@@ -33,7 +39,7 @@ provider:
   tracing: # X-Ray tracing on lambda & apigateway
     lambda: true
     apiGateway: true
-
+  
   ### API Gateway creation/Settings & usage plan
   endpointType: EDGE
   apiGateway:
@@ -77,30 +83,30 @@ package:
 
 # Actual lambda functions
 functions:
-  hello:
-    handler: src/lambdas/hello/handler.handler #fileName.exportName in code
+  create:
+    handler: src/lambdas/create/handler.handler #fileName.exportName in code
     maximumRetryAttempts: 1 #Retry attempts by lambda on failure
     package: # Only package code relevant to this specific lambda
       patterns:
-        - src/lambdas/hello/**
+        - src/lambdas/create/**
     events: #API Gateway integration etc
       - http:
           method: get
-          path: hello
+          path: user/create
           private: true #require api key
           cors: #cors settings
             origin: '*'
 
-  bye:
-    handler: src/lambdas/bye/handler.handler
+  login:
+    handler: src/lambdas/login/handler.handler
     maximumRetryAttempts: 1
     package:
       patterns:
-        - src/lambdas/bye/**
+        - src/lambdas/login/**
     events:
       - http:
           method: get
-          path: bye
+          path: user/login
           private: true
           cors:
             origin: '*'
@@ -110,6 +116,36 @@ functions:
 ###################
 resources:
   Resources:
+
+    # DynamoDB for user data
+    # Check out https://github.com/sbstjn/serverless-dynamodb-autoscaling for autoscaling the capacity units
+    # Check out https://www.serverless.com/plugins/serverless-create-global-dynamodb-table/ for multi-region
+    usersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: userTable
+        AttributeDefinitions:
+          - AttributeName: userid
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S  # Define 'email' attribute with the desired type (S: String, N: Number, etc.)
+        KeySchema:
+          - AttributeName: userid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        GlobalSecondaryIndexes:  # Define the secondary index
+          - IndexName: EmailIndex
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL  # Change this to specify what attributes to include in the index
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+
     # WAF for our api gateway
     wafv2:
       Type: AWS::WAFv2::WebACL
