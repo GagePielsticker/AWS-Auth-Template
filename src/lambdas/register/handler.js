@@ -1,11 +1,15 @@
 /* Coldstart dependency loading */
 const { formatResponse } = require('../../utils/response')
+
 const { DynamoDBClient, PutItemCommand, QueryCommand } = require('@aws-sdk/client-dynamodb')
 const { marshall } = require('@aws-sdk/util-dynamodb')
 const dbClient = new DynamoDBClient({ region: process.env.AWS_REGION })
+
 const { v4: uuidv4 } = require('uuid')
-const argon2 = require('argon2')
+const bcrypt = require('bcryptjs')
 const { string, object } = require('yup')
+
+const jwt = require('jsonwebtoken')
 
 /* Invoke handler */
 exports.handler = async (event, context, callback) => {
@@ -22,10 +26,12 @@ exports.handler = async (event, context, callback) => {
     password: string()
   })
 
-  if (!await inputSchema.validate(body)) {
-    console.log('Could not validate input.')
-    return callback(null, formatResponse({ error: `Invalid Input. Please enter a valid email, username (Less than ${usernameMaxLength} characters), and password.` }, 409))
-  } else console.log('Input Successfully Validated.')
+  try {
+    await inputSchema.validate(body)
+  } catch (error) {
+    console.log(`Error validating input :: ${error}.`)
+    return callback(null, formatResponse({ error: `Invalid Input. ${error}` }, 409))
+  }
 
   body.email = body.email.toLowerCase() // Change our email to lowercase since we check against it for pre-existing users
 
@@ -53,7 +59,7 @@ exports.handler = async (event, context, callback) => {
 
   // Hash our password
   try {
-    var passwordHash = await argon2.hash(body.password)
+    var passwordHash = await bcrypt.hash(body.password, 10)
     console.log('Password Successfully Hashed.')
   } catch (error) {
     console.log(`Error hashing password :: ${error}.`)
@@ -68,13 +74,13 @@ exports.handler = async (event, context, callback) => {
       email: { S: body.email }, // secondary index key
       username: { S: body.username },
       password: { S: passwordHash },
-      createdOn: { S: +new Date() }
+      createdOn: { N: `${+new Date()}` } // You must send numbers to Dynamo as strings, however dynamo will treat it as a number for maths
     }
   }
 
   // Insert into DynamoDB
   try {
-    const putCommand = new PutItemCommand({ TableName: process.env.DYNAMO_TABLE_NAME, Item: dbInput })
+    const putCommand = new PutItemCommand(dbInput)
     await dbClient.send(putCommand)
     console.log(`Successfully added user ${body.username} to database.`)
   } catch (error) {
@@ -82,9 +88,28 @@ exports.handler = async (event, context, callback) => {
     return callback(null, formatResponse({ error: 'Internal Service Error.' }, 500))
   }
 
+  // Generate our JWT to send to the user
+  try {
+    var userToken = jwt.sign(
+      {
+        userid: dbInput.Item.userid,
+        email: dbInput.Item.email
+      },
+      process.env.JWT_KEY, // Random string our app will encrypt/decrypt jwt with. Technically sensitive so should be in secrets manager and auto-rotate.
+      {
+        expiresIn: process.env.JWT_EXPIRY
+      }
+    )
+    console.log('Successfully generated JWT.')
+  } catch (error) {
+    console.log(`Error when generating JWT :: ${error}.`)
+    return callback(null, formatResponse({ error: 'Internal Service Error.' }, 500))
+  }
+
   // Form Response
   const data = {
-    status: 'Successfully created user!'
+    status: 'Successfully created user!',
+    jwt: `${userToken}`
   }
 
   // Send response

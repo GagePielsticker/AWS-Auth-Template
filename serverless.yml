@@ -1,4 +1,4 @@
-service: api-service
+service: auth-service
 
 ###################
 # General Configuration
@@ -29,10 +29,12 @@ provider:
   ### Global environment Vars for lambdas
   environment:
     DYNAMO_TABLE_NAME: 'userTable'
-    USER_INDEX: 'EmailIndex'
+    USER_INDEX: 'EmailIndex' #Secondary Index we can search users by. (We want to be able to pull up user by their email)
+    JWT_KEY: 'q35ZQKcD5HXK8ZAIv1wVR91EEhFeQnPs' #Random string to generate JWT with
+    JWT_EXPIRY: '1d'
 
   runtime: nodejs18.x #node version
-  memorySize: 1024 # optional, in MB, default is 1024
+  memorySize: 512 # optional, in MB, default is 1024
   timeout: 20 # optional, in seconds, default is 6
   architecture: arm64 #architecture to run the lambda (graviton2)
   logRetentionInDays: 7 #time in days to keep lambda logs in cloudwatch
@@ -40,22 +42,25 @@ provider:
     lambda: true
     apiGateway: true
   
+  ### Give Lambda permission to dynamodb
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: 
+      - !Sub arn:aws:dynamodb:*:${AWS::AccountId}:table/${self:provider.environment.DYNAMO_TABLE_NAME}
+      - !Sub arn:aws:dynamodb:*:${AWS::AccountId}:table/${self:provider.environment.DYNAMO_TABLE_NAME}/index/${self:provider.environment.USER_INDEX}
+  
   ### API Gateway creation/Settings & usage plan
-  endpointType: EDGE
+  endpointType: REGIONAL
   apiGateway:
     description: Api Gateway for ${self:service}-${self:provider.stage}
-    apiKeys:
-      - privatekey: # Used to tie key to usage plan
-          - ${self:service}-${self:provider.stage}-KEY
-    usagePlan:
-      - privatekey: # Used to tie key to usage plan. Key will abide by the following
-          quota:
-            limit: 5000 #maximum 5000 request per month, refreshes on 2nd day
-            offset: 2
-            period: MONTH
-          throttle:
-            burstLimit: 200 #maximum number of concurrent requests that API gateway will serve at any given point
-            rateLimit: 100 #request per second limit
 
 # attach waf to api gateway
 custom:
@@ -83,17 +88,17 @@ package:
 
 # Actual lambda functions
 functions:
-  create:
-    handler: src/lambdas/create/handler.handler #fileName.exportName in code
+  register:
+    handler: src/lambdas/register/handler.handler #fileName.exportName in code
     maximumRetryAttempts: 1 #Retry attempts by lambda on failure
     package: # Only package code relevant to this specific lambda
       patterns:
-        - src/lambdas/create/**
+        - src/lambdas/register/**
     events: #API Gateway integration etc
       - http:
-          method: get
-          path: user/create
-          private: true #require api key
+          method: post
+          path: user/register
+          private: false #require api key
           cors: #cors settings
             origin: '*'
 
@@ -105,9 +110,23 @@ functions:
         - src/lambdas/login/**
     events:
       - http:
-          method: get
+          method: post
           path: user/login
-          private: true
+          private: false
+          cors:
+            origin: '*'
+    
+  decode:
+    handler: src/lambdas/decode/handler.handler
+    maximumRetryAttempts: 1
+    package:
+      patterns:
+        - src/lambdas/decode/**
+    events:
+      - http:
+          method: get
+          path: user/decode
+          private: false
           cors:
             origin: '*'
 
@@ -120,10 +139,11 @@ resources:
     # DynamoDB for user data
     # Check out https://github.com/sbstjn/serverless-dynamodb-autoscaling for autoscaling the capacity units
     # Check out https://www.serverless.com/plugins/serverless-create-global-dynamodb-table/ for multi-region
+    # We keep put our email as a secondary index so that we can preserve the ability to change it if the user wishes. 
     usersTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: userTable
+        TableName: ${self:provider.environment.DYNAMO_TABLE_NAME}
         AttributeDefinitions:
           - AttributeName: userid
             AttributeType: S
@@ -136,7 +156,7 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         GlobalSecondaryIndexes:  # Define the secondary index
-          - IndexName: EmailIndex
+          - IndexName: ${self:provider.environment.USER_INDEX}
             KeySchema:
               - AttributeName: email
                 KeyType: HASH
