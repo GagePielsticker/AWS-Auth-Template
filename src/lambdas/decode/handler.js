@@ -32,7 +32,7 @@ exports.handler = async (event, context, callback) => {
   // Return data
   const data = {
     status: 'Successfully validated JWT.',
-    ...decodedToken
+    decodedJWT: decodedToken
   }
 
   return callback(null, formatResponse(data))

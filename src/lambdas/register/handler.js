@@ -92,8 +92,8 @@ exports.handler = async (event, context, callback) => {
   try {
     var userToken = jwt.sign(
       {
-        userid: dbInput.Item.userid,
-        email: dbInput.Item.email
+        userid: dbInput.Item.userid.S,
+        email: dbInput.Item.email.S
       },
       process.env.JWT_KEY, // Random string our app will encrypt/decrypt jwt with. Technically sensitive so should be in secrets manager and auto-rotate.
       {
