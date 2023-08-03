@@ -3,6 +3,21 @@
 
 > A template for starting an AWS based serverless api which integrates JWT authorization and user registration. This utilizes Lambda, api-gateway, WAFv2, and DynamoDB to build a scalable and highly-available rest api. Deployment of all infrastructure fully automated via serverless framework :)
 
+- [AWS Serverless Auth(JWT) Template](#aws-serverless-authjwt-template)
+  - [Architecture](#architecture)
+  - [REST Documentation](#rest-documentation)
+    - [`POST /user/register`](#post-userregister)
+    - [`POST /user/login`](#post-userlogin)
+    - [`POST /user/decode`](#post-userdecode)
+  - [Adding new lambdas](#adding-new-lambdas)
+  - [Adding Environment Variables](#adding-environment-variables)
+  - [Caching](#caching)
+  - [Configuring API Gateway \& Limits](#configuring-api-gateway--limits)
+  - [Deployment](#deployment)
+  - [Dev Dependencies](#dev-dependencies)
+  - [App Dependencies](#app-dependencies)
+  - [Contributing](#contributing)
+
 ## Architecture
 Below is a single region deployment example. All resources here are automatically provisioned and configured via serverless framework and deployed to the configured region.
 <br>
