@@ -1,0 +1,176 @@
+service: api-service
+
+###################
+# General Configuration
+###################
+
+plugins:
+  - serverless-offline
+  - serverless-deployment-bucket
+  - serverless-associate-waf
+
+provider:
+
+  ### General Deployment Settings
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+
+  stackTags:
+    project: ${self:service}
+  tags:
+    project: ${self:service}
+
+  deploymentBucket:
+    name: ${self:service}-${self:provider.stage}-deployment-641 ##MUST BE UNIQUE IN EACH REGION
+    
+  ### Lambda Settings
+  runtime: nodejs18.x #node version
+  memorySize: 1024 # optional, in MB, default is 1024
+  timeout: 20 # optional, in seconds, default is 6
+  architecture: arm64 #architecture to run the lambda (graviton2)
+  logRetentionInDays: 7 #time in days to keep lambda logs in cloudwatch
+  tracing: # X-Ray tracing on lambda & apigateway
+    lambda: true
+    apiGateway: true
+
+  ### API Gateway creation/Settings & usage plan
+  endpointType: EDGE
+  apiGateway:
+    description: Api Gateway for ${self:service}-${self:provider.stage}
+    apiKeys:
+      - privatekey: # Used to tie key to usage plan
+          - ${self:service}-${self:provider.stage}-KEY
+    usagePlan:
+      - privatekey: # Used to tie key to usage plan. Key will abide by the following
+          quota:
+            limit: 5000 #maximum 5000 request per month, refreshes on 2nd day
+            offset: 2
+            period: MONTH
+          throttle:
+            burstLimit: 200 #maximum number of concurrent requests that API gateway will serve at any given point
+            rateLimit: 100 #request per second limit
+
+# attach waf to api gateway
+custom:
+  associateWaf:
+    name: ${self:service}-${self:provider.stage}-WAF
+    version: V2 #(optional) Regional | V2
+  deploymentBucket:
+    blockPublicAccess: true
+    tags:
+      - Key: project
+        Value: ${self:service}
+
+
+###################
+# Lambda Functions to provision
+###################
+# Lambda Packaging Options
+package:
+  individually: true
+  patterns:
+    - '!**/*'
+    - node_modules/**
+    - src/utils/** #Global lambda utils
+    - package.json
+
+# Actual lambda functions
+functions:
+  hello:
+    handler: src/lambdas/hello/handler.handler #fileName.exportName in code
+    maximumRetryAttempts: 1 #Retry attempts by lambda on failure
+    package: # Only package code relevant to this specific lambda
+      patterns:
+        - src/lambdas/hello/**
+    events: #API Gateway integration etc
+      - http:
+          method: get
+          path: hello
+          private: true #require api key
+          cors: #cors settings
+            origin: '*'
+
+  bye:
+    handler: src/lambdas/bye/handler.handler
+    maximumRetryAttempts: 1
+    package:
+      patterns:
+        - src/lambdas/bye/**
+    events:
+      - http:
+          method: get
+          path: bye
+          private: true
+          cors:
+            origin: '*'
+
+###################
+# Additional Resource Provisioning
+###################
+resources:
+  Resources:
+    # WAF for our api gateway
+    wafv2:
+      Type: AWS::WAFv2::WebACL
+      Properties:
+        DefaultAction:
+          Allow: {}
+        Name: ${self:service}-${self:provider.stage}-WAF
+        Scope: REGIONAL
+        VisibilityConfig:
+          CloudWatchMetricsEnabled: False
+          MetricName: ${self:service}-${self:provider.stage}
+          SampledRequestsEnabled: False
+        Tags:
+          - Key: project
+            Value: ${self:service}
+        Rules: 
+          - Name: Core-Rule-Set
+            OverrideAction:
+              None: {}
+            Priority: 0
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: False
+              MetricName: ${self:service}-${self:provider.stage}-WAF
+              SampledRequestsEnabled: False
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: AWS
+                Name: AWSManagedRulesCommonRuleSet
+          - Name: Known-Bad-Input
+            OverrideAction:
+              None: {}
+            Priority: 1
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: False
+              MetricName: ${self:service}-${self:provider.stage}-WAF
+              SampledRequestsEnabled: False
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: AWS
+                Name: AWSManagedRulesKnownBadInputsRuleSet
+          - Name: Anonymous-IP
+            OverrideAction:
+              None: {}
+            Priority: 2
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: False
+              MetricName: ${self:service}-${self:provider.stage}-WAF
+              SampledRequestsEnabled: False
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: AWS
+                Name: AWSManagedRulesAnonymousIpList
+          - Name: IP-Reputation
+            OverrideAction:
+              None: {}
+            Priority: 3
+            VisibilityConfig:
+              CloudWatchMetricsEnabled: False
+              MetricName: ${self:service}-${self:provider.stage}-WAF
+              SampledRequestsEnabled: False
+            Statement:
+              ManagedRuleGroupStatement:
+                VendorName: AWS
+                Name: AWSManagedRulesAmazonIpReputationList
