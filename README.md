@@ -20,16 +20,16 @@ Input: `body (json)`
 
 ```json
 {
-  email: String (must be valid format),
-  username: String (under 20 characters),
-  password: String
+  "email": "String (must be valid format)",
+  "username": "String (under 20 characters)",
+  "password": "String"
 }
 ```
 Example Output
 ```json
 {
-  status: "Successfully created user!",
-  jwt: "xxxxxxxxxxxxxxxxx"
+  "status": "Successfully created user!",
+  "jwt": "xxxxxxxxxxxxxxxxx"
 }
 ```
 ### `POST /user/login`
@@ -38,15 +38,15 @@ Input: `body (json)`
 
 ```json
 {
-  email: String (must be valid format),
-  password: String
+  "email": "String (must be valid format)",
+  "password": "String"
 }
 ```
 Example Output
 ```json
 {
-  status: "Successfully logged in.",
-  jwt: "xxxxxxxxxxxxxxxxx"
+  "status": "Successfully logged in.",
+  "jwt": "xxxxxxxxxxxxxxxxx"
 }
 ```
 
@@ -56,18 +56,18 @@ Input: `body (json)`
 
 ```json
 {
-  jwt: String (must be valid jwt)
+  "jwt": "String (must be valid jwt)"
 }
 ```
 Example Output
 ```json
 {
-  status: "Successfully validated JWT.",
-  decodedJWT: {
-    userid: "xxxxx-xxxx-xxx-x",
-    email: "test@test.com",
-    iat: 1691089483,
-    exp: 1691175883
+  "status": "Successfully validated JWT.",
+  "decodedJWT": {
+    "userid": "xxxxx-xxxx-xxx-x",
+    "email": "test@test.com",
+    "iat": 1691089483,
+    "exp": 1691175883
   }
 }
 ```
