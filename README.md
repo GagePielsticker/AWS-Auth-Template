@@ -1,4 +1,5 @@
 # AWS Serverless Auth(JWT) Template
+![Known Vulnerabilities](https://snyk.io/test/github/gagepielsticker/AWS-Auth-Template/badge.svg) 
 
 > A template for starting an AWS based serverless api which integrates JWT authorization and user registration. This utilizes Lambda, api-gateway, WAFv2, and DynamoDB to build a scalable and highly-available rest api. Deployment of all infrastructure fully automated via serverless framework :)
 
