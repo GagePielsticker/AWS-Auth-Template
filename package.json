@@ -1,11 +1,9 @@
 {
   "name": "aws-auth-template",
   "version": "1.0.0",
-  "description": "",
+  "description": "A serverless template created as an example of user signup & JWT authentication in AWS using DynamoDB, Lambdas, WAFv2, and API-Gateway",
   "main": "index.js",
   "scripts": {
-    "dev": "serverless offline",
-    "test": "jest --coverage && coveralls < coverage/lcov.info",
     "build": "serverless package",
     "deploy": "serverless deploy --stage dev --region us-east-1"
   },
@@ -19,7 +17,9 @@
     "api",
     "service",
     "template",
-    "boilerplate"
+    "boilerplate",
+    "jwt",
+    "jwt-tokens"
   ],
   "author": "James Gage Pielsticker",
   "license": "MIT",
@@ -28,8 +28,6 @@
   },
   "homepage": "https://github.com/GagePielsticker/AWS-Auth-Template#readme",
   "devDependencies": {
-    "coveralls": "^3.1.1",
-    "jest": "^29.5.0",
     "serverless": "^3.30.0",
     "serverless-associate-waf": "^1.2.1",
     "serverless-deployment-bucket": "^1.6.0",
