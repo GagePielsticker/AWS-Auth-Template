@@ -124,7 +124,7 @@ functions:
         - src/lambdas/decode/**
     events:
       - http:
-          method: get
+          method: post
           path: user/decode
           private: false
           cors:
