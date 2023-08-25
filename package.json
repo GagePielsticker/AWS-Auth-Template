@@ -35,7 +35,7 @@
     "standard": "^17.0.0"
   },
   "dependencies": {
-    "aws-sdk": "^2.1428.0",
+    "aws-sdk": "^2.1429.0",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.1",
     "uuid": "^9.0.0",
