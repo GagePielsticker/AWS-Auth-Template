@@ -98,7 +98,7 @@ functions:
       - http:
           method: post
           path: user/register
-          private: false #require api key
+          private: true #require api key
           cors: #cors settings
             origin: '*'
 
@@ -112,7 +112,7 @@ functions:
       - http:
           method: post
           path: user/login
-          private: false
+          private: true
           cors:
             origin: '*'
     
@@ -126,7 +126,7 @@ functions:
       - http:
           method: post
           path: user/decode
-          private: false
+          private: true
           cors:
             origin: '*'
 
